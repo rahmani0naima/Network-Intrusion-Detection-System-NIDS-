@@ -165,8 +165,7 @@ Open `http://127.0.0.1:5000`. The dashboard shows:
 - Alerts by category (doughnut chart)
 - A live-updating table of the most recent 50 alerts, color-coded by severity
 
-It polls `/api/alerts` and `/api/stats` every 5 seconds — no page reload needed.
-![Uploading image.png…]()
+It polls `/api/alerts` and `/api/stats` every 5 seconds 
 
 
 ---
