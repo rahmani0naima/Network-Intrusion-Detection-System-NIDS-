@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NIDS Console</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0d10;
+    --panel:#10151a;
+    --panel-border:#1e2830;
+    --text:#c9d6dc;
+    --text-dim:#5f7580;
+    --accent:#33e0a1;
+    --sev-high:#ff4d5e;
+    --sev-med:#ffb648;
+    --sev-low:#4aa8ff;
+    --mono: 'IBM Plex Mono', 'Courier New', monospace;
+    --sans: 'Inter', -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(51,224,161,0.06), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(255,77,94,0.05), transparent 40%);
+    min-height:100vh;
+  }
+  header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:20px 28px;
+    border-bottom:1px solid var(--panel-border);
+  }
+  .brand{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .brand h1{
+    font-family:var(--mono);
+    font-size:18px;
+    letter-spacing:2px;
+    margin:0;
+    text-transform:uppercase;
+    color:#eef4f6;
+  }
+  .brand .tag{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--text-dim);
+    border:1px solid var(--panel-border);
+    padding:2px 8px;
+    border-radius:3px;
+  }
+  .live{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--accent);
+  }
+  .live .dot{
+    width:8px;height:8px;border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 8px var(--accent);
+    animation:pulse 1.6s infinite;
+  }
+  @keyframes pulse{
+    0%,100%{opacity:1;}
+    50%{opacity:0.25;}
+  }
+  main{
+    padding:24px 28px 60px;
+    max-width:1400px;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:16px;
+  }
+  .stat-card{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:6px;
+    padding:16px 18px;
+  }
+  .stat-card .label{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--text-dim);
+    text-transform:uppercase;
+    letter-spacing:1px;
+  }
+  .stat-card .value{
+    font-family:var(--mono);
+    font-size:32px;
+    color:#eef4f6;
+    margin-top:6px;
+  }
+  .stat-card.high .value{color:var(--sev-high);}
+  .stat-card.med .value{color:var(--sev-med);}
+  .stat-card.low .value{color:var(--sev-low);}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:6px;
+    padding:18px 20px;
+    grid-column:span 4;
+  }
+  .panel.half{grid-column:span 2;}
+  .panel h2{
+    font-family:var(--mono);
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    color:var(--text-dim);
+    margin:0 0 14px 0;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-family:var(--mono);
+    font-size:12.5px;
+  }
+  th{
+    text-align:left;
+    color:var(--text-dim);
+    font-weight:400;
+    text-transform:uppercase;
+    font-size:10.5px;
+    letter-spacing:1px;
+    padding:6px 10px;
+    border-bottom:1px solid var(--panel-border);
+  }
+  td{
+    padding:7px 10px;
+    border-bottom:1px solid rgba(255,255,255,0.03);
+    color:var(--text);
+    white-space:nowrap;
+  }
+  tr:hover td{background:rgba(255,255,255,0.02);}
+  .sev-badge{
+    display:inline-block;
+    padding:2px 8px;
+    border-radius:3px;
+    font-size:10.5px;
+    font-weight:600;
+  }
+  .sev-1{background:rgba(255,77,94,0.15); color:var(--sev-high);}
+  .sev-2{background:rgba(255,182,72,0.15); color:var(--sev-med);}
+  .sev-3{background:rgba(74,168,255,0.15); color:var(--sev-low);}
+  canvas{max-height:260px;}
+  .empty{
+    color:var(--text-dim);
+    font-family:var(--mono);
+    font-size:12px;
+    padding:20px 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>NIDS // Console</h1>
+    <span class="tag">Suricata + custom.rules</span>
+  </div>
+  <div class="live"><span class="dot"></span> LIVE — refreshing every 5s</div>
+</header>
+
+<main>
+  <div class="stat-card">
+    <div class="label">Total Alerts</div>
+    <div class="value" id="stat-total">—</div>
+  </div>
+  <div class="stat-card high">
+    <div class="label">High Severity</div>
+    <div class="value" id="stat-high">—</div>
+  </div>
+  <div class="stat-card med">
+    <div class="label">Medium Severity</div>
+    <div class="value" id="stat-med">—</div>
+  </div>
+  <div class="stat-card low">
+    <div class="label">Low Severity</div>
+    <div class="value" id="stat-low">—</div>
+  </div>
+
+  <div class="panel half">
+    <h2>Alerts over time</h2>
+    <canvas id="chart-timeline"></canvas>
+  </div>
+  <div class="panel half">
+    <h2>Top signatures</h2>
+    <canvas id="chart-signatures"></canvas>
+  </div>
+
+  <div class="panel half">
+    <h2>Top source IPs</h2>
+    <canvas id="chart-srcips"></canvas>
+  </div>
+  <div class="panel half">
+    <h2>By category</h2>
+    <canvas id="chart-category"></canvas>
+  </div>
+
+  <div class="panel">
+    <h2>Recent alerts</h2>
+    <div id="alerts-table-wrap">
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Src IP</th><th>Dest</th><th>Proto</th><th>Signature</th><th>Severity</th></tr>
+        </thead>
+        <tbody id="alerts-body"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+const sevClass = s => s === 1 ? 'sev-1' : (s === 2 ? 'sev-2' : 'sev-3');
+const sevLabel = s => s === 1 ? 'HIGH' : (s === 2 ? 'MED' : 'LOW');
+
+let charts = {};
+
+function upsertChart(id, config){
+  if(charts[id]){
+    charts[id].data = config.data;
+    charts[id].update();
+  } else {
+    charts[id] = new Chart(document.getElementById(id), config);
+  }
+}
+
+const chartDefaults = {
+  color: '#5f7580',
+  font: { family: 'IBM Plex Mono, monospace', size: 10 }
+};
+
+async function refresh(){
+  const [alerts, stats] = await Promise.all([
+    fetch('/api/alerts').then(r => r.json()),
+    fetch('/api/stats').then(r => r.json())
+  ]);
+
+  document.getElementById('stat-total').textContent = stats.total_alerts;
+  document.getElementById('stat-high').textContent = stats.by_severity['1'] || 0;
+  document.getElementById('stat-med').textContent = stats.by_severity['2'] || 0;
+  document.getElementById('stat-low').textContent = stats.by_severity['3'] || 0;
+
+  // Timeline
+  upsertChart('chart-timeline', {
+    type: 'line',
+    data: {
+      labels: stats.timeline.map(t => t[0].slice(11)),
+      datasets: [{
+        data: stats.timeline.map(t => t[1]),
+        borderColor: '#33e0a1',
+        backgroundColor: 'rgba(51,224,161,0.08)',
+        fill: true, tension: 0.3, pointRadius: 0
+      }]
+    },
+    options: {
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#5f7580', font:{size:9}}, grid:{color:'#1e2830'}},
+        y:{ticks:{color:'#5f7580'}, grid:{color:'#1e2830'}, beginAtZero:true}
+      }
+    }
+  });
+
+  // Top signatures
+  upsertChart('chart-signatures', {
+    type: 'bar',
+    data: {
+      labels: stats.top_signatures.map(s => s[0].replace('CUSTOM ', '')),
+      datasets: [{ data: stats.top_signatures.map(s => s[1]), backgroundColor: '#4aa8ff' }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#5f7580'}, grid:{color:'#1e2830'}},
+        y:{ticks:{color:'#5f7580', font:{size:9}}, grid:{display:false}}
+      }
+    }
+  });
+
+  // Top source IPs
+  upsertChart('chart-srcips', {
+    type: 'bar',
+    data: {
+      labels: stats.top_source_ips.map(s => s[0]),
+      datasets: [{ data: stats.top_source_ips.map(s => s[1]), backgroundColor: '#ff4d5e' }]
+    },
+    options: {
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#5f7580', font:{size:9}}, grid:{display:false}},
+        y:{ticks:{color:'#5f7580'}, grid:{color:'#1e2830'}, beginAtZero:true}
+      }
+    }
+  });
+
+  // By category (doughnut)
+  upsertChart('chart-category', {
+    type: 'doughnut',
+    data: {
+      labels: stats.by_category.map(c => c[0]),
+      datasets: [{
+        data: stats.by_category.map(c => c[1]),
+        backgroundColor: ['#33e0a1','#4aa8ff','#ffb648','#ff4d5e','#a78bfa','#f472b6']
+      }]
+    },
+    options: { plugins:{legend:{position:'right', labels:{color:'#c9d6dc', font:{size:10}}}} }
+  });
+
+  // Alerts table
+  const body = document.getElementById('alerts-body');
+  if(alerts.length === 0){
+    body.innerHTML = '<tr><td colspan="6" class="empty">No alerts yet. Waiting for Suricata events...</td></tr>';
+  } else {
+    body.innerHTML = alerts.slice(0, 50).map(a => `
+      <tr>
+        <td>${(a.timestamp || '').replace('T',' ').slice(0,19)}</td>
+        <td>${a.src_ip || '-'}</td>
+        <td>${a.dest_ip || '-'}:${a.dest_port || '-'}</td>
+        <td>${a.proto || '-'}</td>
+        <td>${(a.signature || '-').replace('CUSTOM ', '')}</td>
+        <td><span class="sev-badge ${sevClass(a.severity)}">${sevLabel(a.severity)}</span></td>
+      </tr>
+    `).join('');
+  }
+}
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
