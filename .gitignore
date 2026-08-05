@@ -1,0 +1,5 @@
+pcaps/*.pcap
+*.pyc
+__pycache__/
+venv/
+incidents.log
